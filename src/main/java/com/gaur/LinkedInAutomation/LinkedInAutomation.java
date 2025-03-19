@@ -17,8 +17,8 @@ public class LinkedInAutomation {
             LinkedInAutomation automation = new LinkedInAutomation();
 
             // Step 1: Login
-            automation.loginToLinkedIn(page, "gupta.gaurav4188@gmail.com", "");
-            String companyName = "D.E Shaw";
+            automation.loginToLinkedIn(page, "gupta.gaurav4188@gmail.com", "noida@4188");
+            String companyName = "Phonepe";
 
 //             Step 2: Extract recruiters from connections
             //List<String> recruiterProfiles = automation.extractRecruiters(page, companyName);
@@ -45,26 +45,27 @@ public class LinkedInAutomation {
         }
 
         HashSet<String> recruiterProfiles = new HashSet<>();
-        recruiterProfiles.add("https://www.linkedin.com/in/ranjith-badri-0a205668/"); // Testing to be removed
 
         // Step 2: Loop through multiple pages (up to 10 pages)
-        for (int pageNum = 1; pageNum <= 2; pageNum++) {
+        for (int pageNum = 1; pageNum <= 1; pageNum++) {
             try {
                 System.out.println("Scraping page: " + pageNum);
 
                 // Collect recruiter profiles from the current page
+                // Scroll and click "Next" button
+                page.evaluate("window.scrollTo(0, document.body.scrollHeight)");
+                page.waitForTimeout(3000);
+
                 List<Locator> recruiters = page.locator("//a[contains(@href, '/in/')]").all();
                 for (Locator recruiter : recruiters) {
                     String profileUrl = recruiter.getAttribute("href");
-                    if (profileUrl != null) {
+                    String recruiterFirstName = recruiter.innerText().trim().split("\n")[0].split(" ")[0].toLowerCase(); // Extract text
+
+                    if (profileUrl != null && profileUrl.toLowerCase().contains(recruiterFirstName)) {
                         recruiterProfiles.add(profileUrl);
                         System.out.println("Found Recruiter: " + profileUrl);
                     }
                 }
-
-                // Scroll and click "Next" button
-                page.evaluate("window.scrollTo(0, document.body.scrollHeight)");
-                page.waitForTimeout(5000);
 
                 Locator nextPageButton = page.locator("//button[contains(@aria-label,'Next') and contains(@class,'artdeco-pagination__button--next')]");
                 if (nextPageButton.isVisible()) {
@@ -117,7 +118,7 @@ public class LinkedInAutomation {
                         }
                         if (moreActionButton != null) {
                             moreActionButton.click();
-                            page.waitForTimeout(4000);
+                            page.waitForTimeout(3000);
                             System.out.println("More Action Button Clicked");
 
                             String innerConnect = String.format(
@@ -134,7 +135,24 @@ public class LinkedInAutomation {
                             }
                             if (innerConnectButton != null) {
                                 innerConnectButton.click();
-                                page.waitForTimeout(4000);
+                                page.waitForTimeout(3000);
+
+                                Locator addNoteButton = page.locator("button:has-text('Add a note')");
+                                if (addNoteButton.isVisible()) {
+                                    addNoteButton.click();
+                                    page.waitForTimeout(3000);
+
+                                    // Fill in the note
+                                    String message = "With 4.5+ years total experience working currently as Associate at GS working as Backend Engineer in Java, Python, and Microservices system design, I believe I could be a great fit. Looking forward to connecting for opportunity!";
+                                    page.fill("textarea[name='message']", message);
+
+                                    // Click "Send"
+                                    page.click("button:has-text('Send')");
+                                    page.waitForTimeout(3000);
+
+                                    System.out.println("Connection request sent to: " + profileUrl);
+                                    connectionRequestsSent.add(profileUrl);
+                                }
                             } else {
                                 System.out.println("No connect button for: " + profileUrl);
                             }
@@ -143,35 +161,36 @@ public class LinkedInAutomation {
                         System.out.println("Error clicking 'More Actions' for " + recruiterName + ": " + e.getMessage());
                         continue; // Skip to next recruiter
                     }
-                }
-
-                for (Locator connectButton : connectButtons) {
-                    try {
-                        if (connectButton.isVisible()) {
-                            connectButton.click();
-                            page.waitForTimeout(5000);
-
-                            // Click "Add a Note"
-                            Locator addNoteButton = page.locator("button:has-text('Add a note')");
-                            if (addNoteButton.isVisible()) {
-                                addNoteButton.click();
-                                page.waitForTimeout(5000);
-
-                                // Fill in the note
-                                String message = "With 4.5+ years total experience working currently as Associate at GS working as Backend Engineer in Java, Python, and Microservices system design, I believe I could be a great fit. Looking forward to connecting for opportunity!";
-                                page.fill("textarea[name='message']", message);
-
-                                // Click "Send"
-                                page.click("button:has-text('Send')");
-                                page.waitForTimeout(5000);
-
-                                System.out.println("Connection request sent to: " + profileUrl);
-                                connectionRequestsSent.add(profileUrl);
-                            }
+                } else {
+                    Locator connectButton = null;
+                    for (Locator tempL : connectButtons) {
+                        if (tempL.isVisible()) {
+                            connectButton = tempL;
+                            break;
                         }
-                    } catch (Exception e) {
-                        System.out.println("Error sending connection request to " + recruiterName + ": " + e.getMessage());
-                        continue; // Skip to next recruiter
+                    }
+                    if (connectButton != null) {
+                        connectButton.click();
+                        page.waitForTimeout(3000);
+
+                        Locator addNoteButton = page.locator("button:has-text('Add a note')");
+                        if (addNoteButton.isVisible()) {
+                            addNoteButton.click();
+                            page.waitForTimeout(3000);
+
+                            // Fill in the note
+                            String message = "With 4.5+ years total experience working currently as Associate at GS working as Backend Engineer in Java, Python, and Microservices system design, I believe I could be a great fit. Looking forward to connecting for opportunity!";
+                            page.fill("textarea[name='message']", message);
+
+                            // Click "Send"
+                            page.click("button:has-text('Send')");
+                            page.waitForTimeout(3000);
+
+                            System.out.println("Connection request sent to: " + profileUrl);
+                            connectionRequestsSent.add(profileUrl);
+                        }
+                    } else {
+                        System.out.println("No connect button for: " + profileUrl);
                     }
                 }
             } catch (Exception e) {
