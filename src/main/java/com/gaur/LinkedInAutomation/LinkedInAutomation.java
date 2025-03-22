@@ -7,6 +7,10 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 
+import static com.gaur.LinkedInAutomation.util.LinkedinAutomationConstants.messageTemplateForNewConnection;
+import static com.gaur.LinkedInAutomation.util.LinkedinAutomationConstants.messageTemplateForRecruiter;
+
+
 public class LinkedInAutomation {
 
     public static void main(String[] args) {
@@ -17,14 +21,14 @@ public class LinkedInAutomation {
             LinkedInAutomation automation = new LinkedInAutomation();
 
             // Step 1: Login
-            automation.loginToLinkedIn(page, "gupta.gaurav4188@gmail.com", "noida@4188");
-            String companyName = "Phonepe";
+            automation.loginToLinkedIn(page, "gupta.gaurav4188@gmail.com", "");
+            String companyName = "Amazon";
 
 //             Step 2: Extract recruiters from connections
-            //List<String> recruiterProfiles = automation.extractRecruiters(page, companyName);
+            List<String> recruiterProfiles = automation.sendMessageToFirstConnections(page, companyName);
 
 
-            automation.sendConnectionRequests(page, companyName);
+//            automation.sendConnectionRequests(page, companyName);
 
             browser.close();
         }
@@ -36,7 +40,7 @@ public class LinkedInAutomation {
 
         // Step 1: Navigate to LinkedIn search page for recruiters
         try {
-            String searchUrl = "https://www.linkedin.com/search/results/people/?keywords=Recruiter%20" + companyName;
+            String searchUrl = "https://www.linkedin.com/search/results/people/?keywords=Talent%20Acquisition%20" + companyName;
             page.navigate(searchUrl);
             page.waitForTimeout(5000);
         } catch (Exception e) {
@@ -143,7 +147,7 @@ public class LinkedInAutomation {
                                     page.waitForTimeout(3000);
 
                                     // Fill in the note
-                                    String message = "With 4.5+ years total experience working currently as Associate at GS working as Backend Engineer in Java, Python, and Microservices system design, I believe I could be a great fit. Looking forward to connecting for opportunity!";
+                                    String message = messageTemplateForNewConnection;
                                     page.fill("textarea[name='message']", message);
 
                                     // Click "Send"
@@ -179,7 +183,7 @@ public class LinkedInAutomation {
                             page.waitForTimeout(3000);
 
                             // Fill in the note
-                            String message = "With 4.5+ years total experience working currently as Associate at GS working as Backend Engineer in Java, Python, and Microservices system design, I believe I could be a great fit. Looking forward to connecting for opportunity!";
+                            String message = messageTemplateForNewConnection;
                             page.fill("textarea[name='message']", message);
 
                             // Click "Send"
@@ -221,139 +225,180 @@ public class LinkedInAutomation {
         System.out.println("Login successful!");
     }
 
-    public List<String> extractRecruiters(Page page, String companyName) {
-        page.navigate("https://www.linkedin.com/mynetwork/invite-connect/connections/");
-        page.waitForTimeout(3000); // Wait for the page to load
+    public String getCompanyCodeFromCompanyName(Page page, String companyName){
+        try{
+            String searchUrl = "https://www.linkedin.com/search/results/companies/?keywords=" + companyName;
+            page.navigate(searchUrl);
+            page.waitForTimeout(4000);
 
-        // Step 1: Click the "Search with Filters" link
-        Locator filterLink = page.locator("a[href*='/search/results/people']");
-        if (filterLink.isVisible()) {
-            filterLink.click();
-            page.waitForTimeout(6000); // Wait for filters page to load
+            Locator companyLink = page.locator("a[href*='/company/']:visible").first();
+            String companyUrl = companyLink.getAttribute("href");
+            page.navigate(companyUrl);
+            page.waitForTimeout(4000);
+
+            // Get first search result
+            String htmlContent = page.content();
+            String pattern = "companyIds=(\\d+)";
+            java.util.regex.Matcher matcher = java.util.regex.Pattern.compile(pattern).matcher(htmlContent);
+            String companyId = matcher.find() ? matcher.group(1) : null;
+
+            if (companyId != null) {
+                System.out.println("Company ID for " + companyName + ": " + companyId);
+                return companyId;
+            } else {
+                return null;
+            }
+        } catch(Exception e){
+            return null;
         }
+    }
 
-        // Step 2: Click the "Current company" filter button
-        Locator currentCompanyFilterButton = page.locator("#searchFilter_currentCompany");
-        if (currentCompanyFilterButton.isVisible()) {
-            currentCompanyFilterButton.click();
-            page.waitForTimeout(2000); // Wait for dropdown to appear
-        }
+    public List<String> sendMessageToFirstConnections(Page page, String companyName) {
+        List<String> connectionsSendMessage = new ArrayList<>();
+        String companyId = getCompanyCodeFromCompanyName(page, companyName);
 
-        System.out.println("Please manually select the company and then press Enter in the console...");
         try {
-            System.in.read(); // Pause execution until user presses Enter
+            String connectionURL = "https://www.linkedin.com/search/results/people/?currentCompany=%5B%22" + companyId + "%22%5D&network=%5B%22F%22%5D&origin=FACETED_SEARCH";
+            page.navigate(connectionURL);
+            page.waitForTimeout(5000); // Wait for the page to load
         } catch (Exception e) {
-            e.printStackTrace();
+            System.out.println("Error navigating to company search page: " + e.getMessage());
+            return connectionsSendMessage; // Skip execution if company page fails
         }
 
         System.out.println("Filtered by company. Extracting recruiters...");
 
-        // Step 4: Find the recruiter list
-        List<Locator> recruiters = page.locator("//a[contains(@href, '/in/')]").all();
         HashSet<String> recruiterProfiles = new HashSet<>();
 
-        for (Locator recruiter : recruiters) {
-            String profileUrl = recruiter.getAttribute("href");
-            if (profileUrl != null) {
-                recruiterProfiles.add(profileUrl);
-                System.out.println("Found Recruiter: " + profileUrl);
+        try {
+            // Step 4: Find the recruiter list
+            List<Locator> recruiters = page.locator("//a[contains(@href, '/in/')]").all();
+
+            for (Locator recruiter : recruiters) {
+                try {
+                    String profileUrl = recruiter.getAttribute("href");
+                    String recruiterFirstName = recruiter.innerText().trim().split("\n")[0].split(" ")[0].toLowerCase(); // Extract text
+
+                    if (profileUrl != null && profileUrl.toLowerCase().contains(recruiterFirstName)) {
+                        recruiterProfiles.add(profileUrl);
+                        System.out.println("Found Recruiter: " + profileUrl);
+                    }
+                } catch (Exception e) {
+                    System.out.println("Error extracting recruiter details: " + e.getMessage());
+                    continue; // Skip to next recruiter
+                }
             }
+        } catch (Exception e) {
+            System.out.println("Error retrieving recruiter list: " + e.getMessage());
+            return connectionsSendMessage; // Skip execution if list retrieval fails
         }
 
         for (String profileUrl : recruiterProfiles) {
-            page.navigate(profileUrl);
-            page.waitForTimeout(3000);
-
-            Locator nameTag = page.locator("//a[contains(@href, '/overlay/about-this-profile/') and contains(@aria-label, '')]");
-            String recruiterName = nameTag.getAttribute("aria-label");
-
-            System.out.println("Recruiter Name: " + recruiterName);
-
-            if (recruiterName == null) {
-                System.out.println("Skipping profile: Could not extract recruiter name.");
+            try {
+                page.navigate(profileUrl);
+                page.waitForTimeout(5000);
+            } catch (Exception e) {
+                System.out.println("Error navigating to recruiter profile: " + e.getMessage());
+                continue; // Skip to next recruiter
             }
 
-            String firstName = recruiterName.split(" ")[0];
+            String recruiterName = null;
+            try {
+                Locator nameTag = page.locator("//a[contains(@href, '/overlay/about-this-profile/') and contains(@aria-label, '')]");
+                recruiterName = nameTag.getAttribute("aria-label");
+                System.out.println("Recruiter Name: " + recruiterName);
 
-            String connectButtonSelector = String.format(
-                    "//button[contains(@aria-label, 'Message %s') and contains(@class, 'artdeco-button--primary')]"
-//                + "[.//svg[@data-test-icon='connect-small']]"
-//                + "[.//span[contains(@class, 'artdeco-button__text') and normalize-space()='Connect']]",  // Ensures it's the correct connect button
-                    ,firstName
-            );
-            List<Locator> connectButtons = page.locator(connectButtonSelector).all();
-            System.out.println("Found " + connectButtons.size() + " Connect buttons for " + recruiterName);
-
-            for(int i=0; i < connectButtons.size(); i++) {
-                Locator connectButton = connectButtons.get(i);
-                System.out.println("Message button Visible: " + connectButton.isVisible());
-                if (connectButton.isVisible()) {
-                    connectButton.click();
-                    page.waitForTimeout(5000);
+                if (recruiterName == null) {
+                    System.out.println("Skipping profile: Could not extract recruiter name.");
+                    continue;
                 }
+            } catch (Exception e) {
+                System.out.println("Error extracting recruiter name: " + e.getMessage());
+                continue; // Skip to next recruiter
+            }
 
-                String message = String.format("Hi %s,\n" +
-                        "\n" +
-                        "I recently saw some posts regarding openings for SWE2(4.5+YOE) roles %s.\n" +
-                        "\n" +
-                        "I'm currently looking to explore newer opportunities and would be interested in applying for Software Developer-2(Backend).\n" +
-                        "\n" +
-                        "Could you please help align my application for these roles, if there are openings?\n" +
-                        "\n" +
-                        "Based on my experience as a Associate(SDE-2) at Goldman Sachs, Amazon, and Samsung working as Backend Engineer with Java, Python, AWS, Microservices, System Design I believe I can be a good fit.\n" +
-                        "\n" +
-                        "I would like to bring your attention to my background which makes me suitable for the job role:\n" +
-                        "\n" +
-                        "* Name: Gaurav Gupta\n" +
-                        "* Years of Experience: 4.5+ Years\n" +
-                        "* Current Company: Goldman Sachs\n" +
-                        "* Role in Current Company: Associate(Engineering)\n" +
-                        "* Previous Company: Amazon (1year 8 months)\n" +
-                        "* Role in Previous Company: SDE\n" +
-                        "\n" +
-                        "For more information, I'll attach my resume here.\n" +
-                        "\n" +
-                        "It would be a pleasure if I can hear back from you regarding any opportunities. \n" +
-                        "\n" +
-                        "Sincerely,\n" +
-                        "Gaurav Gupta\n" +
-                        "Contact No.+919779642202\n" +
-                        "Email: gg.gaurav243@gmail.com", firstName, companyName);
+            try {
+                String firstName = recruiterName.split(" ")[0];
 
-                Locator messageBox = page.locator("div.msg-form__contenteditable");
-                if (messageBox.isVisible()) {
-                    messageBox.fill(message);
+                String connectButtonSelector = String.format(
+                        "//button[contains(@aria-label, 'Message %s') and contains(@class, 'artdeco-button--primary')]", firstName
+                );
+                List<Locator> connectButtons = page.locator(connectButtonSelector).all();
+                System.out.println("Found " + connectButtons.size() + " Connect buttons for " + recruiterName);
 
-                    System.out.println("Message typed for: " + recruiterName);
+                for (Locator connectButton : connectButtons) {
+                    try {
+                        System.out.println("Message button Visible: " + connectButton.isVisible());
+                        if (connectButton.isVisible()) {
+                            connectButton.click();
+                            page.waitForTimeout(5000);
+                        }
+                    } catch (Exception e) {
+                        System.out.println("Error clicking message button: " + e.getMessage());
+                        continue; // Skip to next recruiter
+                    }
 
-                    String attachButtonSelector = String.format(
-                            "button[aria-label='Attach a file to your conversation with %s']",
-                            recruiterName
-                    );
+                    try {
+                        Locator messageBox = page.locator("div.msg-form__contenteditable");
+                        String messageForRecruiter = String.format(messageTemplateForRecruiter, firstName, companyName);
+                        if (messageBox.isVisible()) {
+                            messageBox.fill(messageForRecruiter);
+                            System.out.println("Message typed for: " + recruiterName);
+                            page.waitForTimeout(2000);
+                        } else {
+                            System.out.println("Message box not found for: " + recruiterName);
+                            continue;
+                        }
+                    } catch (Exception e) {
+                        System.out.println("Error typing message: " + e.getMessage());
+                        continue;
+                    }
 
-                    Locator attachButton = page.locator(attachButtonSelector);
-                    if (attachButton.isVisible()) {
-                        attachButton.click();
-                        page.waitForTimeout(2000);
+                    try {
+                        Locator attachButton = page.locator("button:has-text('Attach a file')");
+                        if (attachButton.isVisible()) {
+                            attachButton.click();
+                            page.waitForTimeout(5000);
 
-                        // Upload resume from local storage
-                        page.setInputFiles("input[type='file']", Paths.get("/Users/gaurgupr/Desktop/Projects/LinkedInAutomation/src/main/resources/Gaurav Gupta - Resume.pdf"));
-                        System.out.println("Resume attached for: " + recruiterName);
-                        page.waitForTimeout(3000);
+                            // Upload resume from local storage
+                            page.setInputFiles("input[type='file']", Paths.get("/Users/gaurgupr/Desktop/Projects/LinkedInAutomation/src/main/resources/Gaurav Gupta - Resume.pdf"));
+                            System.out.println("Resume attached for: " + recruiterName);
+                            page.waitForTimeout(5000);
+                        } else {
+                            System.out.println("Attachment button not found for: " + recruiterName);
+                        }
+                    } catch (Exception e) {
+                        System.out.println("Error attaching resume: " + e.getMessage());
+                        continue;
+                    }
 
+                    try {
                         Locator sendButton = page.locator("//button[contains(@class, 'msg-form__send-button artdeco-button artdeco-button--1')]");
                         if (sendButton.isVisible()) {
                             sendButton.click();
-                            page.waitForTimeout(3000);
+                            page.waitForTimeout(5000);
                             System.out.println("Message sent to: " + recruiterName);
+
+                            Locator closeButton = page.locator("//button[contains(@class, 'msg-overlay-bubble-header__control artdeco-button artdeco-button--circle')]");
+                            if (closeButton.isVisible()) {
+                                closeButton.click();
+                                page.waitForTimeout(5000);
+                            }
+                            connectionsSendMessage.add(profileUrl);
+                            System.out.println(profileUrl);
                         } else {
                             System.out.println("Send button not found for: " + recruiterName);
                         }
+                    } catch (Exception e) {
+                        System.out.println("Error sending message: " + e.getMessage());
                     }
                 }
+            } catch (Exception e) {
+                System.out.println("Unexpected error in processing recruiter: " + e.getMessage());
+                continue; // Skip to next recruiter
             }
-
         }
-        return null;
+
+        return connectionsSendMessage;
     }
 }
