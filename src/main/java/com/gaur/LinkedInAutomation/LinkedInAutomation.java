@@ -1,11 +1,11 @@
 package com.gaur.LinkedInAutomation;
 
 import com.microsoft.playwright.*;
+import net.bytebuddy.dynamic.scaffold.MethodGraph;
 
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
+import java.util.regex.Pattern;
 
 import static com.gaur.LinkedInAutomation.util.LinkedinAutomationConstants.messageTemplateForNewConnection;
 import static com.gaur.LinkedInAutomation.util.LinkedinAutomationConstants.messageTemplateForRecruiter;
@@ -13,25 +13,56 @@ import static com.gaur.LinkedInAutomation.util.LinkedinAutomationConstants.messa
 
 public class LinkedInAutomation {
 
+//    public static void main(String[] args) {
+//        try (Playwright playwright = Playwright.create()) {
+//            for(int i=1; i<=6;i++){
+//                Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(false));
+//                Page page = browser.newPage();;
+//
+//                LinkedInAutomation automation = new LinkedInAutomation();
+//
+//                // Step 1: Login
+//                //observe.ai, dream11
+////            List<String> companyName = Arrays.asList( "grab", "gojek", "mastercard", "agoda", "nutanix");
+//                String companyName = "godaddy";
+//
+////             Step 2: Extract recruiters from connections
+//                page = browser.newPage();
+//                automation.loginToLinkedIn(page, "gupta.gaurav4188@gmail.com", "noida@4188");
+//
+//
+//                List<String> recruiterProfiles = automation.sendMessageToFirstConnections(page, companyName,i);
+//
+////            for(String company: companyName){
+////                page = browser.newPage();
+////                automation.loginToLinkedIn(page, "gupta.gaurav4188@gmail.com", "noida@4188");
+////                automation.sendConnectionRequests(page, company);
+////            }
+//                browser.close();
+//
+//            }
+//
+//        }
+//    }
+
     public static void main(String[] args) {
         try (Playwright playwright = Playwright.create()) {
-            Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(false));
-            Page page = browser.newPage();
+                Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(false));
+                LinkedInAutomation automation = new LinkedInAutomation();
 
-            LinkedInAutomation automation = new LinkedInAutomation();
+                // Step 1: Login
+                //observe.ai, dream11
+            List<String> companyName = Arrays.asList( "mastercard", "observe.ai", "nutanix");
+            Page page;
 
-            // Step 1: Login
-            automation.loginToLinkedIn(page, "gupta.gaurav4188@gmail.com", "");
-            String companyName = "Amazon";
+            for(String company: companyName){
+                page = browser.newPage();
+                automation.loginToLinkedIn(page, "gupta.gaurav4188@gmail.com", "noida@4188");
+                automation.sendConnectionRequests(page, company);
+            }
+                browser.close();
 
-//             Step 2: Extract recruiters from connections
-            List<String> recruiterProfiles = automation.sendMessageToFirstConnections(page, companyName);
-
-
-//            automation.sendConnectionRequests(page, companyName);
-
-            browser.close();
-        }
+            }
     }
 
     public void sendConnectionRequests(Page page, String companyName) {
@@ -48,10 +79,10 @@ public class LinkedInAutomation {
             return;
         }
 
-        HashSet<String> recruiterProfiles = new HashSet<>();
+        LinkedHashSet<String> recruiterProfiles = new LinkedHashSet<>();
 
         // Step 2: Loop through multiple pages (up to 10 pages)
-        for (int pageNum = 1; pageNum <= 1; pageNum++) {
+        for (int pageNum = 2; pageNum <= 4; pageNum++) {
             try {
                 System.out.println("Scraping page: " + pageNum);
 
@@ -86,115 +117,127 @@ public class LinkedInAutomation {
         }
 
         System.out.println("Total recruiters found: " + recruiterProfiles.size());
+        recruiterProfiles.remove("https://www.linkedin.com/in/gaurav-gupta-aertc127k/recent-activity/");
 
         // Step 3: Send connection requests
         for (String profileUrl : recruiterProfiles) {
+            if(connectionRequestsSent.size() >= 10){
+                connectionRequestsSent.forEach(url ->{
+                    System.out.println(url);
+                });
+                return;
+            }
             try {
                 page.navigate(profileUrl);
                 page.waitForTimeout(5000);
 
-                Locator nameTag = page.locator("//a[contains(@href, '/overlay/about-this-profile/') and contains(@aria-label, '')]");
-                String recruiterName = nameTag.getAttribute("aria-label");
+                Locator companyTagButton = page.locator("button[aria-label*='Current company']");
+                String companyTag = companyTagButton.getAttribute("aria-label");
 
-                if (recruiterName == null) {
-                    System.out.println("Skipping profile: Could not extract recruiter name.");
-                    continue;
-                }
+                if(companyTag.toLowerCase().contains(companyName.toLowerCase())){
+                    Locator nameTag = page.locator("//a[contains(@href, '/overlay/about-this-profile/') and contains(@aria-label, '')]");
+                    String recruiterName = nameTag.getAttribute("aria-label");
 
-                String connectButtonSelector = String.format(
-                        "//button[contains(@aria-label, 'Invite %s to connect') and contains(@class, 'artdeco-button--primary')]",
-                        recruiterName
-                );
+                    if (recruiterName == null) {
+                        System.out.println("Skipping profile: Could not extract recruiter name.");
+                        continue;
+                    }
 
-                List<Locator> connectButtons = page.locator(connectButtonSelector).all();
-                System.out.println("Found " + connectButtons.size() + " Connect buttons for " + recruiterName);
+                    String connectButtonSelector = String.format(
+                            "//button[contains(@aria-label, 'Invite %s to connect') and contains(@class, 'artdeco-button--primary')]",
+                            recruiterName
+                    );
 
-                if (connectButtons.isEmpty()) {
-                    // Try "More Actions" dropdown
-                    try {
-                        List<Locator> moreActionButtons = page.locator("//button[contains(@aria-label,'More actions') and contains(@class,'artdeco-dropdown__trigger')]").all();
-                        Locator moreActionButton = null;
-                        for (Locator tempL : moreActionButtons) {
-                            if (tempL.isVisible()) {
-                                moreActionButton = tempL;
-                                break;
-                            }
-                        }
-                        if (moreActionButton != null) {
-                            moreActionButton.click();
-                            page.waitForTimeout(3000);
-                            System.out.println("More Action Button Clicked");
+                    List<Locator> connectButtons = page.locator(connectButtonSelector).all();
+                    System.out.println("Found " + connectButtons.size() + " Connect buttons for " + recruiterName);
 
-                            String innerConnect = String.format(
-                                    "//div[contains(@aria-label,'Invite %s to connect') and contains(@role,'button')]",
-                                    recruiterName
-                            );
-                            List<Locator> innerConnectButtons = page.locator(innerConnect).all();
-                            Locator innerConnectButton = null;
-                            for (Locator tempL : innerConnectButtons) {
+                    if (connectButtons.isEmpty()) {
+                        // Try "More Actions" dropdown
+                        try {
+                            List<Locator> moreActionButtons = page.locator("//button[contains(@aria-label,'More actions') and contains(@class,'artdeco-dropdown__trigger')]").all();
+                            Locator moreActionButton = null;
+                            for (Locator tempL : moreActionButtons) {
                                 if (tempL.isVisible()) {
-                                    innerConnectButton = tempL;
+                                    moreActionButton = tempL;
                                     break;
                                 }
                             }
-                            if (innerConnectButton != null) {
-                                innerConnectButton.click();
+                            if (moreActionButton != null) {
+                                moreActionButton.click();
                                 page.waitForTimeout(3000);
+                                System.out.println("More Action Button Clicked");
 
-                                Locator addNoteButton = page.locator("button:has-text('Add a note')");
-                                if (addNoteButton.isVisible()) {
-                                    addNoteButton.click();
-                                    page.waitForTimeout(3000);
-
-                                    // Fill in the note
-                                    String message = messageTemplateForNewConnection;
-                                    page.fill("textarea[name='message']", message);
-
-                                    // Click "Send"
-                                    page.click("button:has-text('Send')");
-                                    page.waitForTimeout(3000);
-
-                                    System.out.println("Connection request sent to: " + profileUrl);
-                                    connectionRequestsSent.add(profileUrl);
+                                String innerConnect = String.format(
+                                        "//div[contains(@aria-label,'Invite %s to connect') and contains(@role,'button')]",
+                                        recruiterName
+                                );
+                                List<Locator> innerConnectButtons = page.locator(innerConnect).all();
+                                Locator innerConnectButton = null;
+                                for (Locator tempL : innerConnectButtons) {
+                                    if (tempL.isVisible()) {
+                                        innerConnectButton = tempL;
+                                        break;
+                                    }
                                 }
-                            } else {
-                                System.out.println("No connect button for: " + profileUrl);
+                                if (innerConnectButton != null) {
+                                    innerConnectButton.click();
+                                    page.waitForTimeout(3000);
+
+                                    Locator addNoteButton = page.locator("button:has-text('Add a note')");
+                                    if (addNoteButton.isVisible()) {
+                                        addNoteButton.click();
+                                        page.waitForTimeout(3000);
+
+                                        // Fill in the note
+                                        String message = messageTemplateForNewConnection;
+                                        page.fill("textarea[name='message']", message);
+
+                                        // Click "Send"
+                                        page.click("button:has-text('Send')");
+                                        page.waitForTimeout(3000);
+
+                                        System.out.println("Connection request sent to: " + profileUrl);
+                                        connectionRequestsSent.add(profileUrl);
+                                    }
+                                } else {
+                                    System.out.println("No connect button for: " + profileUrl);
+                                }
                             }
-                        }
-                    } catch (Exception e) {
-                        System.out.println("Error clicking 'More Actions' for " + recruiterName + ": " + e.getMessage());
-                        continue; // Skip to next recruiter
-                    }
-                } else {
-                    Locator connectButton = null;
-                    for (Locator tempL : connectButtons) {
-                        if (tempL.isVisible()) {
-                            connectButton = tempL;
-                            break;
-                        }
-                    }
-                    if (connectButton != null) {
-                        connectButton.click();
-                        page.waitForTimeout(3000);
-
-                        Locator addNoteButton = page.locator("button:has-text('Add a note')");
-                        if (addNoteButton.isVisible()) {
-                            addNoteButton.click();
-                            page.waitForTimeout(3000);
-
-                            // Fill in the note
-                            String message = messageTemplateForNewConnection;
-                            page.fill("textarea[name='message']", message);
-
-                            // Click "Send"
-                            page.click("button:has-text('Send')");
-                            page.waitForTimeout(3000);
-
-                            System.out.println("Connection request sent to: " + profileUrl);
-                            connectionRequestsSent.add(profileUrl);
+                        } catch (Exception e) {
+                            System.out.println("Error clicking 'More Actions' for " + recruiterName + ": " + e.getMessage());
+                            continue; // Skip to next recruiter
                         }
                     } else {
-                        System.out.println("No connect button for: " + profileUrl);
+                        Locator connectButton = null;
+                        for (Locator tempL : connectButtons) {
+                            if (tempL.isVisible()) {
+                                connectButton = tempL;
+                                break;
+                            }
+                        }
+                        if (connectButton != null) {
+                            connectButton.click();
+                            page.waitForTimeout(3000);
+
+                            Locator addNoteButton = page.locator("button:has-text('Add a note')");
+                            if (addNoteButton.isVisible()) {
+                                addNoteButton.click();
+                                page.waitForTimeout(3000);
+
+                                // Fill in the note
+                                String message = messageTemplateForNewConnection;
+                                page.fill("textarea[name='message']", message);
+
+                                // Click "Send"
+                                page.click("button:has-text('Send')");
+                                page.waitForTimeout(3000);
+
+                                System.out.println("Connection request sent to: " + profileUrl);
+                                connectionRequestsSent.add(profileUrl);
+                            }
+                        } else {
+                            System.out.println("No connect button for: " + profileUrl);
+                        }
                     }
                 }
             } catch (Exception e) {
@@ -253,45 +296,47 @@ public class LinkedInAutomation {
         }
     }
 
-    public List<String> sendMessageToFirstConnections(Page page, String companyName) {
+    public List<String> sendMessageToFirstConnections(Page page, String companyName, int i) {
         List<String> connectionsSendMessage = new ArrayList<>();
-        String companyId = getCompanyCodeFromCompanyName(page, companyName);
+//        String companyId = getCompanyCodeFromCompanyName(page, companyName);
+        LinkedHashSet<String> recruiterProfiles = new LinkedHashSet<>();
 
-        try {
-            String connectionURL = "https://www.linkedin.com/search/results/people/?currentCompany=%5B%22" + companyId + "%22%5D&network=%5B%22F%22%5D&origin=FACETED_SEARCH";
-            page.navigate(connectionURL);
-            page.waitForTimeout(5000); // Wait for the page to load
-        } catch (Exception e) {
-            System.out.println("Error navigating to company search page: " + e.getMessage());
-            return connectionsSendMessage; // Skip execution if company page fails
-        }
-
-        System.out.println("Filtered by company. Extracting recruiters...");
-
-        HashSet<String> recruiterProfiles = new HashSet<>();
-
-        try {
-            // Step 4: Find the recruiter list
-            List<Locator> recruiters = page.locator("//a[contains(@href, '/in/')]").all();
-
-            for (Locator recruiter : recruiters) {
-                try {
-                    String profileUrl = recruiter.getAttribute("href");
-                    String recruiterFirstName = recruiter.innerText().trim().split("\n")[0].split(" ")[0].toLowerCase(); // Extract text
-
-                    if (profileUrl != null && profileUrl.toLowerCase().contains(recruiterFirstName)) {
-                        recruiterProfiles.add(profileUrl);
-                        System.out.println("Found Recruiter: " + profileUrl);
-                    }
-                } catch (Exception e) {
-                    System.out.println("Error extracting recruiter details: " + e.getMessage());
-                    continue; // Skip to next recruiter
-                }
+//        for(int i=1; i<=9; i++){
+            try {
+                String connectionURL = "https://www.linkedin.com/search/results/people/?keywords=" + companyName.toLowerCase()+ "&network=%5B%22F%22%5D&origin=FACETED_SEARCH&page="+i;
+//                String connectionURL = "https://www.linkedin.com/search/results/people/?currentCompany=%5B%22" + companyId + "%22%5D&network=%5B%22F%22%5D&origin=FACETED_SEARCH&page="+i;
+                page.navigate(connectionURL);
+                page.waitForTimeout(5000); // Wait for the page to load
+            } catch (Exception e) {
+                System.out.println("Error navigating to company search page: " + e.getMessage());
+                return connectionsSendMessage; // Skip execution if company page fails
             }
-        } catch (Exception e) {
-            System.out.println("Error retrieving recruiter list: " + e.getMessage());
-            return connectionsSendMessage; // Skip execution if list retrieval fails
-        }
+
+            System.out.println("Filtered by company. Extracting recruiters...");
+
+            try {
+                // Step 4: Find the recruiter list
+                List<Locator> recruiters = page.locator("//a[contains(@href, '/in/')]").all();
+
+                for (Locator recruiter : recruiters) {
+                    try {
+                        String profileUrl = recruiter.getAttribute("href");
+                        String recruiterFirstName = recruiter.innerText().trim().split("\n")[0].split(" ")[0].toLowerCase(); // Extract text
+
+                        if (profileUrl != null && profileUrl.toLowerCase().contains(recruiterFirstName)) {
+                            recruiterProfiles.add(profileUrl);
+                            System.out.println("Found Recruiter: " + profileUrl);
+                        }
+                    } catch (Exception e) {
+                        System.out.println("Error extracting recruiter details: " + e.getMessage());
+                        continue; // Skip to next recruiter
+                    }
+                }
+            } catch (Exception e) {
+                System.out.println("Error retrieving recruiter list: " + e.getMessage());
+                return connectionsSendMessage; // Skip execution if list retrieval fails
+            }
+
 
         for (String profileUrl : recruiterProfiles) {
             try {
@@ -395,6 +440,7 @@ public class LinkedInAutomation {
                 }
             } catch (Exception e) {
                 System.out.println("Unexpected error in processing recruiter: " + e.getMessage());
+                System.out.println("Total Connections Messaged: "+ connectionsSendMessage.size());
                 continue; // Skip to next recruiter
             }
         }

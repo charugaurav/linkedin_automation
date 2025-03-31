@@ -1,5 +1,9 @@
 package com.gaur.LinkedInAutomation.util;
 
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.Set;
+
 public class LinkedinAutomationConstants {
     public static String messageTemplateForRecruiter = "Hi %s,\n" +
             "\n" +
@@ -32,4 +36,8 @@ public class LinkedinAutomationConstants {
     public static String messageTemplateForNewConnection = "With 4.5+ years total experience working currently " +
             "as Associate at GS working as Backend Engineer in Java, Python, and Microservices system design, " +
             "I believe I could be a great fit. Looking forward to connecting for opportunity!";
+
+    public static Set<String> blockedUrl = new HashSet<>(Arrays.asList(
+       "https://www.linkedin.com/in/manjunath-tamaka-shreerama-0a877150/"
+    ));
 }
