@@ -5,6 +5,9 @@ import net.bytebuddy.dynamic.scaffold.MethodGraph;
 
 import java.nio.file.Paths;
 import java.util.*;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.regex.Pattern;
 
 import static com.gaur.LinkedInAutomation.util.LinkedinAutomationConstants.messageTemplateForNewConnection;
@@ -13,46 +16,38 @@ import static com.gaur.LinkedInAutomation.util.LinkedinAutomationConstants.messa
 
 public class LinkedInAutomation {
 
-//    public static void main(String[] args) {
-//        try (Playwright playwright = Playwright.create()) {
-//            for(int i=1; i<=6;i++){
-//                Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(false));
-//                Page page = browser.newPage();;
-//
-//                LinkedInAutomation automation = new LinkedInAutomation();
-//
-//                // Step 1: Login
-//                //observe.ai, dream11
-////            List<String> companyName = Arrays.asList( "grab", "gojek", "mastercard", "agoda", "nutanix");
-//                String companyName = "godaddy";
-//
-////             Step 2: Extract recruiters from connections
-//                page = browser.newPage();
-//                automation.loginToLinkedIn(page, "gupta.gaurav4188@gmail.com", "noida@4188");
-//
-//
-//                List<String> recruiterProfiles = automation.sendMessageToFirstConnections(page, companyName,i);
-//
-////            for(String company: companyName){
-////                page = browser.newPage();
-////                automation.loginToLinkedIn(page, "gupta.gaurav4188@gmail.com", "noida@4188");
-////                automation.sendConnectionRequests(page, company);
-////            }
-//                browser.close();
-//
-//            }
-//
-//        }
-//    }
+    private static int THREAD_SIZE;
+    private static ExecutorService executor;
 
-    public static void main(String[] args) {
+    // Function to send messages
+    public void sendMessages() {
+        try (Playwright playwright = Playwright.create()) {
+            for(int i = 1; i <= 6; i++){
+                Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(false));
+                Page page = browser.newPage();
+
+                LinkedInAutomation automation = new LinkedInAutomation();
+
+                // Step 1: Login
+                String companyName = "intuit";
+
+                // Step 2: Extract recruiters from connections
+                page = browser.newPage();
+                automation.loginToLinkedIn(page, "gupta.gaurav4188@gmail.com", "noida@4188");
+                List<String> recruiterProfiles = automation.sendMessageToFirstConnections(page, companyName, i);
+                browser.close();
+            }
+        }
+    }
+
+    public void sendConnections() {
         try (Playwright playwright = Playwright.create()) {
                 Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(false));
                 LinkedInAutomation automation = new LinkedInAutomation();
 
                 // Step 1: Login
                 //observe.ai, dream11
-            List<String> companyName = Arrays.asList( "mastercard", "observe.ai", "nutanix");
+            List<String> companyName = Arrays.asList("intuit");
             Page page;
 
             for(String company: companyName){
@@ -63,6 +58,34 @@ public class LinkedInAutomation {
                 browser.close();
 
             }
+    }
+
+    public static void main(String[] args) {
+        LinkedInAutomation obj = new LinkedInAutomation();
+        Thread sendConnections = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                obj.sendConnections();
+            }
+        });
+
+        Thread sendMessages = new Thread(new Runnable() {
+            @Override
+            public void run() {
+                obj.sendMessages();
+            }
+        });
+
+        sendConnections.start();
+        sendMessages.start();
+
+        try {
+            // Wait for both threads to complete
+            sendConnections.join();
+            sendMessages.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
     }
 
     public void sendConnectionRequests(Page page, String companyName) {
@@ -82,7 +105,7 @@ public class LinkedInAutomation {
         LinkedHashSet<String> recruiterProfiles = new LinkedHashSet<>();
 
         // Step 2: Loop through multiple pages (up to 10 pages)
-        for (int pageNum = 2; pageNum <= 4; pageNum++) {
+        for (int pageNum = 1; pageNum <= 4; pageNum++) {
             try {
                 System.out.println("Scraping page: " + pageNum);
 
