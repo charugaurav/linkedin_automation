@@ -47,12 +47,12 @@ public class LinkedInAutomation {
 
                 // Step 1: Login
                 //observe.ai, dream11
-            List<String> companyName = Arrays.asList("Microsoft", "Visa", "Wayfair");
+            List<String> companyName = Arrays.asList("Wayfair");
             Page page;
 
             for(String company: companyName){
                 page = browser.newPage();
-                automation.loginToLinkedIn(page, "gupta.gaurav4188@gmail.com", "noida@4188");
+                automation.loginToLinkedIn(page, "gupta.gaurav4188@gmail.com", "");
                 automation.sendConnectionRequests(page, company);
             }
                 browser.close();
