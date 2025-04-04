@@ -7,7 +7,7 @@ import java.util.Set;
 public class LinkedinAutomationConstants {
     public static String messageTemplateForRecruiter = "Hi %s,\n" +
             "\n" +
-            "I recently saw some posts regarding openings for SWE2(4.5+YOE) roles %s.\n" +
+            "I recently saw some posts regarding openings for SDE2(4.5+YOE) roles %s.\n" +
             "\n" +
             "I'm currently looking to explore newer opportunities and would be interested in applying for Software Developer-2(Backend).\n" +
             "\n" +

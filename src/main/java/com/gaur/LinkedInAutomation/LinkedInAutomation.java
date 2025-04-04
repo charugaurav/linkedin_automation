@@ -22,18 +22,18 @@ public class LinkedInAutomation {
     // Function to send messages
     public void sendMessages() {
         try (Playwright playwright = Playwright.create()) {
-            for(int i = 1; i <= 6; i++){
+            for(int i = 1; i <= 4; i++){
                 Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(false));
                 Page page = browser.newPage();
 
                 LinkedInAutomation automation = new LinkedInAutomation();
 
                 // Step 1: Login
-                String companyName = "intuit";
+                String companyName = "Wayfair";
 
                 // Step 2: Extract recruiters from connections
                 page = browser.newPage();
-                automation.loginToLinkedIn(page, "gupta.gaurav4188@gmail.com", "noida@4188");
+                automation.loginToLinkedIn(page, "gupta.gaurav4188@gmail.com", "");
                 List<String> recruiterProfiles = automation.sendMessageToFirstConnections(page, companyName, i);
                 browser.close();
             }
@@ -47,7 +47,7 @@ public class LinkedInAutomation {
 
                 // Step 1: Login
                 //observe.ai, dream11
-            List<String> companyName = Arrays.asList("intuit");
+            List<String> companyName = Arrays.asList("Microsoft", "Visa", "Wayfair");
             Page page;
 
             for(String company: companyName){
@@ -69,20 +69,20 @@ public class LinkedInAutomation {
             }
         });
 
-        Thread sendMessages = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                obj.sendMessages();
-            }
-        });
+//        Thread sendMessages = new Thread(new Runnable() {
+//            @Override
+//            public void run() {
+//                obj.sendMessages();
+//            }
+//        });
 
         sendConnections.start();
-        sendMessages.start();
+//        sendMessages.start();
 
         try {
             // Wait for both threads to complete
             sendConnections.join();
-            sendMessages.join();
+//            sendMessages.join();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
@@ -370,101 +370,106 @@ public class LinkedInAutomation {
                 continue; // Skip to next recruiter
             }
 
-            String recruiterName = null;
-            try {
-                Locator nameTag = page.locator("//a[contains(@href, '/overlay/about-this-profile/') and contains(@aria-label, '')]");
-                recruiterName = nameTag.getAttribute("aria-label");
-                System.out.println("Recruiter Name: " + recruiterName);
+            Locator companyTagButton = page.locator("button[aria-label*='Current company']");
+            String companyTag = companyTagButton.getAttribute("aria-label");
 
-                if (recruiterName == null) {
-                    System.out.println("Skipping profile: Could not extract recruiter name.");
-                    continue;
+            if(companyTag.toLowerCase().contains(companyName.toLowerCase())){
+                String recruiterName = null;
+                try {
+                    Locator nameTag = page.locator("//a[contains(@href, '/overlay/about-this-profile/') and contains(@aria-label, '')]");
+                    recruiterName = nameTag.getAttribute("aria-label");
+                    System.out.println("Recruiter Name: " + recruiterName);
+
+                    if (recruiterName == null) {
+                        System.out.println("Skipping profile: Could not extract recruiter name.");
+                        continue;
+                    }
+                } catch (Exception e) {
+                    System.out.println("Error extracting recruiter name: " + e.getMessage());
+                    continue; // Skip to next recruiter
                 }
-            } catch (Exception e) {
-                System.out.println("Error extracting recruiter name: " + e.getMessage());
-                continue; // Skip to next recruiter
-            }
 
-            try {
-                String firstName = recruiterName.split(" ")[0];
+                try {
+                    String firstName = recruiterName.split(" ")[0];
 
-                String connectButtonSelector = String.format(
-                        "//button[contains(@aria-label, 'Message %s') and contains(@class, 'artdeco-button--primary')]", firstName
-                );
-                List<Locator> connectButtons = page.locator(connectButtonSelector).all();
-                System.out.println("Found " + connectButtons.size() + " Connect buttons for " + recruiterName);
+                    String connectButtonSelector = String.format(
+                            "//button[contains(@aria-label, 'Message %s') and contains(@class, 'artdeco-button--primary')]", firstName
+                    );
+                    List<Locator> connectButtons = page.locator(connectButtonSelector).all();
+                    System.out.println("Found " + connectButtons.size() + " Connect buttons for " + recruiterName);
 
-                for (Locator connectButton : connectButtons) {
-                    try {
-                        System.out.println("Message button Visible: " + connectButton.isVisible());
-                        if (connectButton.isVisible()) {
-                            connectButton.click();
-                            page.waitForTimeout(5000);
-                        }
-                    } catch (Exception e) {
-                        System.out.println("Error clicking message button: " + e.getMessage());
-                        continue; // Skip to next recruiter
-                    }
-
-                    try {
-                        Locator messageBox = page.locator("div.msg-form__contenteditable");
-                        String messageForRecruiter = String.format(messageTemplateForRecruiter, firstName, companyName);
-                        if (messageBox.isVisible()) {
-                            messageBox.fill(messageForRecruiter);
-                            System.out.println("Message typed for: " + recruiterName);
-                            page.waitForTimeout(2000);
-                        } else {
-                            System.out.println("Message box not found for: " + recruiterName);
-                            continue;
-                        }
-                    } catch (Exception e) {
-                        System.out.println("Error typing message: " + e.getMessage());
-                        continue;
-                    }
-
-                    try {
-                        Locator attachButton = page.locator("button:has-text('Attach a file')");
-                        if (attachButton.isVisible()) {
-                            attachButton.click();
-                            page.waitForTimeout(5000);
-
-                            // Upload resume from local storage
-                            page.setInputFiles("input[type='file']", Paths.get("/Users/gaurgupr/Desktop/Projects/LinkedInAutomation/src/main/resources/Gaurav Gupta - Resume.pdf"));
-                            System.out.println("Resume attached for: " + recruiterName);
-                            page.waitForTimeout(5000);
-                        } else {
-                            System.out.println("Attachment button not found for: " + recruiterName);
-                        }
-                    } catch (Exception e) {
-                        System.out.println("Error attaching resume: " + e.getMessage());
-                        continue;
-                    }
-
-                    try {
-                        Locator sendButton = page.locator("//button[contains(@class, 'msg-form__send-button artdeco-button artdeco-button--1')]");
-                        if (sendButton.isVisible()) {
-                            sendButton.click();
-                            page.waitForTimeout(5000);
-                            System.out.println("Message sent to: " + recruiterName);
-
-                            Locator closeButton = page.locator("//button[contains(@class, 'msg-overlay-bubble-header__control artdeco-button artdeco-button--circle')]");
-                            if (closeButton.isVisible()) {
-                                closeButton.click();
+                    for (Locator connectButton : connectButtons) {
+                        try {
+                            System.out.println("Message button Visible: " + connectButton.isVisible());
+                            if (connectButton.isVisible()) {
+                                connectButton.click();
                                 page.waitForTimeout(5000);
                             }
-                            connectionsSendMessage.add(profileUrl);
-                            System.out.println(profileUrl);
-                        } else {
-                            System.out.println("Send button not found for: " + recruiterName);
+                        } catch (Exception e) {
+                            System.out.println("Error clicking message button: " + e.getMessage());
+                            continue; // Skip to next recruiter
                         }
-                    } catch (Exception e) {
-                        System.out.println("Error sending message: " + e.getMessage());
+
+                        try {
+                            Locator messageBox = page.locator("div.msg-form__contenteditable");
+                            String messageForRecruiter = String.format(messageTemplateForRecruiter, firstName, companyName);
+                            if (messageBox.isVisible()) {
+                                messageBox.fill(messageForRecruiter);
+                                System.out.println("Message typed for: " + recruiterName);
+                                page.waitForTimeout(2000);
+                            } else {
+                                System.out.println("Message box not found for: " + recruiterName);
+                                continue;
+                            }
+                        } catch (Exception e) {
+                            System.out.println("Error typing message: " + e.getMessage());
+                            continue;
+                        }
+
+                        try {
+                            Locator attachButton = page.locator("button:has-text('Attach a file')");
+                            if (attachButton.isVisible()) {
+                                attachButton.click();
+                                page.waitForTimeout(5000);
+
+                                // Upload resume from local storage
+                                page.setInputFiles("input[type='file']", Paths.get("/Users/gaurgupr/Desktop/Projects/LinkedInAutomation/src/main/resources/Gaurav Gupta - Resume.pdf"));
+                                System.out.println("Resume attached for: " + recruiterName);
+                                page.waitForTimeout(5000);
+                            } else {
+                                System.out.println("Attachment button not found for: " + recruiterName);
+                            }
+                        } catch (Exception e) {
+                            System.out.println("Error attaching resume: " + e.getMessage());
+                            continue;
+                        }
+
+                        try {
+                            Locator sendButton = page.locator("//button[contains(@class, 'msg-form__send-button artdeco-button artdeco-button--1')]");
+                            if (sendButton.isVisible()) {
+                                sendButton.click();
+                                page.waitForTimeout(5000);
+                                System.out.println("Message sent to: " + recruiterName);
+
+                                Locator closeButton = page.locator("//button[contains(@class, 'msg-overlay-bubble-header__control artdeco-button artdeco-button--circle')]");
+                                if (closeButton.isVisible()) {
+                                    closeButton.click();
+                                    page.waitForTimeout(5000);
+                                }
+                                connectionsSendMessage.add(profileUrl);
+                                System.out.println(profileUrl);
+                            } else {
+                                System.out.println("Send button not found for: " + recruiterName);
+                            }
+                        } catch (Exception e) {
+                            System.out.println("Error sending message: " + e.getMessage());
+                        }
                     }
+                } catch (Exception e) {
+                    System.out.println("Unexpected error in processing recruiter: " + e.getMessage());
+                    System.out.println("Total Connections Messaged: "+ connectionsSendMessage.size());
+                    continue; // Skip to next recruiter
                 }
-            } catch (Exception e) {
-                System.out.println("Unexpected error in processing recruiter: " + e.getMessage());
-                System.out.println("Total Connections Messaged: "+ connectionsSendMessage.size());
-                continue; // Skip to next recruiter
             }
         }
 
