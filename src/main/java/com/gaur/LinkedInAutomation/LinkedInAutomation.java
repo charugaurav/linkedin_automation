@@ -76,7 +76,7 @@ public class LinkedInAutomation {
 
             // Step 1: Login
             //observe.ai, dream11
-            List<String> companyName = Arrays.asList("oracle", "target");
+            List<String> companyName = Arrays.asList( "razorpay", "navi","siemens");
             Page page;
 
             for (String company : companyName) {
@@ -88,7 +88,9 @@ public class LinkedInAutomation {
                     }
                     page = browser.newPage();
                     loginToLinkedIn(page);
-                    sendConnectionRequests.sendConnectionRequests(page, company, i, totalConnectionsSend);
+                    int totalSend = sendConnectionRequests.sendConnectionRequests(page, company, i, totalConnectionsSend);
+                    totalConnectionsSend += totalSend;
+                    System.out.println("Total connection Send to Company " + company + " : " + totalConnectionsSend);
                     page.close(); // Close individual page, not entire browser
                 }
                 for (String s : recruiterProfiles) {

@@ -10,7 +10,7 @@ import java.util.List;
 import static com.gaur.LinkedInAutomation.util.LinkedinAutomationConstants.messageTemplateForNewConnection;
 
 public class SendConnectionRequests {
-    public void sendConnectionRequests(Page page, String companyName, int pageNumber, Integer totalConnectionsSend) {
+    public int sendConnectionRequests(Page page, String companyName, int pageNumber, Integer totalConnectionsSend) {
         List<String> connectionRequestsSent = new ArrayList<>();
         LinkedHashSet<String> recruiterProfiles = new LinkedHashSet<>();
         System.out.println("Searching for recruiters at: " + companyName);
@@ -22,7 +22,7 @@ public class SendConnectionRequests {
             page.waitForTimeout(5000);
         } catch (Exception e) {
             System.out.println("Error navigating to search page: " + e.getMessage());
-            return;
+            return 0;
         }
 
         // Step 2: Loop through multiple pages (up to 10 pages)
@@ -64,12 +64,12 @@ public class SendConnectionRequests {
 
         // Step 3: Send connection requests
         for (String profileUrl : recruiterProfiles) {
-            if(totalConnectionsSend >= 15) return;
+            if(totalConnectionsSend >= 15) return 15;
             if(connectionRequestsSent.size() >= 15){
                 connectionRequestsSent.forEach(url ->{
                     System.out.println(url);
                 });
-                return;
+                return 15;
             }
             try {
                 page.navigate(profileUrl);
@@ -201,5 +201,6 @@ public class SendConnectionRequests {
         for (String connectionSent : connectionRequestsSent) {
             System.out.println(connectionSent);
         }
+        return totalConnectionsSend;
     }
 }
