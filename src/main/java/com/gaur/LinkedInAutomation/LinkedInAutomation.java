@@ -5,23 +5,25 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.gaur.LinkedInAutomation.service.SendConnectionRequests;
 import com.gaur.LinkedInAutomation.service.SendMessageToFirstConnections;
 import com.gaur.LinkedInAutomation.service.SendMessageToNewestConnections;
-import com.microsoft.playwright.Browser;
-import com.microsoft.playwright.BrowserType;
-import com.microsoft.playwright.Page;
-import com.microsoft.playwright.Playwright;
+import com.microsoft.playwright.*;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.nio.file.Paths;
 import java.util.Arrays;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
-
+import java.util.concurrent.Executors;
 
 public class LinkedInAutomation {
 
-    private int THREAD_SIZE;
-    private ExecutorService executor;
+    private static final String CREDENTIALS_FILE = "/Users/gaurgupr/Desktop/Projects/LinkedInAutomation/src/main/java/com/gaur/LinkedInAutomation/credentials.json";
+    private static final String AUTH_DATA_PATH = "/Users/gaurgupr/Desktop/Projects/LinkedInAutomation/auth-data";
+
+    private final ExecutorService executor;
 
     public SendConnectionRequests sendConnectionRequests;
     private SendMessageToFirstConnections sendMessageToFirstConnections;
@@ -31,21 +33,30 @@ public class LinkedInAutomation {
         sendConnectionRequests = new SendConnectionRequests();
         sendMessageToFirstConnections = new SendMessageToFirstConnections();
         sendMessageToNewestConnections = new SendMessageToNewestConnections();
+        executor = Executors.newFixedThreadPool(4);
     }
 
     // Function to send messages
     public void sendMessages() {
         try (Playwright playwright = Playwright.create()) {
             for (int i = 1; i <= 4; i++) {
-                Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(false));
+                BrowserType.LaunchPersistentContextOptions options = new BrowserType.LaunchPersistentContextOptions()
+                        .setHeadless(false);
+                BrowserContext browser = playwright.chromium().launchPersistentContext(Paths.get(AUTH_DATA_PATH), options);
                 Page page = browser.newPage();
 
                 // Step 1: Login
                 String companyName = "american express";
 
                 // Step 2: Extract recruiters from connections
-                loginToLinkedIn(page);
+                saveLoginSession(page);
                 List<String> recruiterProfiles = sendMessageToFirstConnections.sendMessageToFirstConnections(page, companyName, i);
+
+                for (String profile : recruiterProfiles) {
+                    System.out.println("Messaged recruiter: " + profile);
+                }
+
+                page.close();
                 browser.close();
             }
         } catch (IOException e) {
@@ -55,15 +66,18 @@ public class LinkedInAutomation {
 
     public void sendMessagesToNewestConnections() {
         try (Playwright playwright = Playwright.create()) {
-            Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(false));
+            BrowserType.LaunchPersistentContextOptions options = new BrowserType.LaunchPersistentContextOptions()
+                    .setHeadless(false);
+            BrowserContext browser = playwright.chromium().launchPersistentContext(Paths.get(AUTH_DATA_PATH), options);
             Page page = browser.newPage();
 
             // Step 1: Login
             String companyName = "american express";
 
             // Step 2: Extract recruiters from connections
-            loginToLinkedIn(page);
+            saveLoginSession(page);
             sendMessageToNewestConnections.sendMessageToNewestConnections(page);
+            page.close();
             browser.close();
         } catch (IOException e) {
             throw new RuntimeException(e);
@@ -72,29 +86,36 @@ public class LinkedInAutomation {
 
     public void sendConnections() {
         try (Playwright playwright = Playwright.create()) {
-            Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(false));
+            BrowserType.LaunchPersistentContextOptions options = new BrowserType.LaunchPersistentContextOptions()
+                    .setHeadless(false);
+            BrowserContext browser = playwright.chromium().launchPersistentContext(Paths.get(AUTH_DATA_PATH), options);
+            Page page = browser.newPage();
 
             // Step 1: Login
             //observe.ai, dream11
-            List<String> companyName = Arrays.asList( "razorpay", "navi","siemens");
-            Page page;
+            List<String> companyNames = Arrays.asList("rivigo","tesco","tripadvisor");
 
-            for (String company : companyName) {
-                Integer totalConnectionsSend = 0;
+            for (String company : companyNames) {
+
+                int totalConnectionsSend = 0;
                 LinkedHashSet<String> recruiterProfiles = new LinkedHashSet<>();
-                for (int i = 1; i <= 4; i++) {
+                List<Integer> pages = Arrays.asList(1,2,3,4);
+
+                for (int i : pages) {
                     if (totalConnectionsSend >= 15) {
+                        page.close();
                         break;
                     }
                     page = browser.newPage();
-                    loginToLinkedIn(page);
-                    int totalSend = sendConnectionRequests.sendConnectionRequests(page, company, i, totalConnectionsSend);
+                    page = saveLoginSession(page);
+                    int totalSend = sendConnectionRequests.sendConnectionRequests(page, company, Arrays.asList(i), totalConnectionsSend);
                     totalConnectionsSend += totalSend;
-                    System.out.println("Total connection Send to Company " + company + " : " + totalConnectionsSend);
+                    System.out.println("Total connection sent to company " + company + ": " + totalConnectionsSend);
                     page.close(); // Close individual page, not entire browser
                 }
+
                 for (String s : recruiterProfiles) {
-                    System.out.println(s);
+                    System.out.println("Recruiter profile: " + s);
                 }
             }
             browser.close(); // Close browser after all iterations
@@ -105,19 +126,9 @@ public class LinkedInAutomation {
 
     public static void main(String[] args) {
         LinkedInAutomation obj = new LinkedInAutomation();
-        Thread sendConnections = new Thread(new Runnable() {
-            @Override
-            public void run() {
-                obj.sendConnections();
-            }
-        });
+        Thread sendConnections = new Thread(() -> obj.sendConnections());
 
-//        Thread sendMessages = new Thread(new Runnable() {
-//            @Override
-//            public void run() {
-//                obj.sendMessages();
-//            }
-//        });
+//        Thread sendMessages = new Thread(() -> obj.sendMessages());
 
         sendConnections.start();
 //        sendMessages.start();
@@ -131,21 +142,38 @@ public class LinkedInAutomation {
         }
     }
 
-    public static void loginToLinkedIn(Page page) throws IOException {
-        page.navigate("https://www.linkedin.com/login");
-        ObjectMapper mapper = new ObjectMapper();
-        JsonNode node = mapper.readTree(new File("/Users/gaurgupr/Desktop/Projects/LinkedInAutomation/src/main/java/com/gaur/LinkedInAutomation/credentials.json"));
+    public static Page saveLoginSession(Page page) throws IOException {
+        try {
 
-        String email = node.get("email").asText();
-        String password = node.get("password").asText();
+            // Try navigating to LinkedIn homepage
+            page.navigate("https://www.linkedin.com/feed/");
+            page.waitForTimeout(3000);
 
-        page.fill("#username", email);
-        page.fill("#password", password);
-        page.click("button[type='submit']");
-        page.waitForTimeout(5000); // Wait for login to complete
+            // If redirected to login page, then login is needed
+            if (page.url().contains("/login")) {
+                System.out.println("No active session found, logging in...");
+                ObjectMapper mapper = new ObjectMapper();
+                JsonNode node = mapper.readTree(new File(CREDENTIALS_FILE));
+                String email = node.get("email").asText();
+                String password = node.get("password").asText();
 
-        System.out.println("Login successful!");
+                page.fill("#username", email);
+                page.fill("#password", password);
+                page.click("button[type='submit']");
+                page.waitForTimeout(5000);
+
+                System.out.println("Login completed and session saved.");
+            } else {
+                System.out.println("Already logged in. Skipping login.");
+            }
+            // Let user manually close if needed (e.g., CAPTCHA)
+            // context.close(); // You may skip this if you want the session to persist
+        } catch (IOException e) {
+            return page;
+        }
+        return page;
     }
+
 
 //    public String getCompanyCodeFromCompanyName(Page page, String companyName){
 //        try{
