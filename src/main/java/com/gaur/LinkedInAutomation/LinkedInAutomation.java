@@ -93,7 +93,7 @@ public class LinkedInAutomation {
 
             // Step 1: Login
             //observe.ai, dream11
-            List<String> companyNames = Arrays.asList("rivigo","tesco","tripadvisor");
+            List<String> companyNames = Arrays.asList("juspay","razorpay","swiggy");
 
             for (String company : companyNames) {
 
@@ -126,7 +126,7 @@ public class LinkedInAutomation {
 
     public static void main(String[] args) {
         LinkedInAutomation obj = new LinkedInAutomation();
-        Thread sendConnections = new Thread(() -> obj.sendConnections());
+        Thread sendConnections = new Thread(() -> obj.sendMessagesToNewestConnections());
 
 //        Thread sendMessages = new Thread(() -> obj.sendMessages());
 
