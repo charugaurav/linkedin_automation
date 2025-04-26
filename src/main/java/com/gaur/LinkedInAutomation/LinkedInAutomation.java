@@ -106,7 +106,6 @@ public class LinkedInAutomation {
                         page.close();
                         break;
                     }
-                    page = browser.newPage();
                     page = saveLoginSession(page);
                     int totalSend = sendConnectionRequests.sendConnectionRequests(page, company, Arrays.asList(i), totalConnectionsSend);
                     totalConnectionsSend += totalSend;

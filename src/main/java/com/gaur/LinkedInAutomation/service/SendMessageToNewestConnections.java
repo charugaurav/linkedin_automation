@@ -73,7 +73,10 @@ import java.util.List;
 
 import static com.gaur.LinkedInAutomation.util.LinkedinAutomationConstants.messageTemplateForRecruiter;
 
+
 public class SendMessageToNewestConnections {
+
+    private static final String CREDENTIALS_FILE = "/Users/gaurgupr/Desktop/Projects/LinkedInAutomation/src/main/java/com/gaur/LinkedInAutomation/credentials.json";
     public void sendMessageToNewestConnections(Page page) {
         LinkedHashSet<String> recruiterProfiles = new LinkedHashSet<>();
 
@@ -130,7 +133,7 @@ public class SendMessageToNewestConnections {
             Browser browser = playwright.chromium().launch(new BrowserType.LaunchOptions().setHeadless(false));
             // 1. Get the sublist (group of 10 recruiters)
             Page page = browser.newPage();
-            loginToLinkedIn(page);
+            page = loginToLinkedIn(page);
             List<String> batch = recruiterUrls.subList(i, Math.min(i + batchSize, total));
             sendMessages(batch, page);
 
@@ -140,20 +143,36 @@ public class SendMessageToNewestConnections {
         }
     }
 
-    public static void loginToLinkedIn(Page page) throws IOException {
-        page.navigate("https://www.linkedin.com/login");
-        ObjectMapper mapper = new ObjectMapper();
-        JsonNode node = mapper.readTree(new File("/Users/gaurgupr/Desktop/Projects/LinkedInAutomation/src/main/java/com/gaur/LinkedInAutomation/credentials.json"));
+    public static Page loginToLinkedIn(Page page) throws IOException {
+        try {
 
-        String email = node.get("email").asText();
-        String password = node.get("password").asText();
+            // Try navigating to LinkedIn homepage
+            page.navigate("https://www.linkedin.com/feed/");
+            page.waitForTimeout(3000);
 
-        page.fill("#username", email);
-        page.fill("#password", password);
-        page.click("button[type='submit']");
-        page.waitForTimeout(5000); // Wait for login to complete
+            // If redirected to login page, then login is needed
+            if (page.url().contains("/login")) {
+                System.out.println("No active session found, logging in...");
+                ObjectMapper mapper = new ObjectMapper();
+                JsonNode node = mapper.readTree(new File(CREDENTIALS_FILE));
+                String email = node.get("email").asText();
+                String password = node.get("password").asText();
 
-        System.out.println("Login successful!");
+                page.fill("#username", email);
+                page.fill("#password", password);
+                page.click("button[type='submit']");
+                page.waitForTimeout(5000);
+
+                System.out.println("Login completed and session saved.");
+            } else {
+                System.out.println("Already logged in. Skipping login.");
+            }
+            // Let user manually close if needed (e.g., CAPTCHA)
+            // context.close(); // You may skip this if you want the session to persist
+        } catch (IOException e) {
+            return page;
+        }
+        return page;
     }
 
     private void sendMessages(List<String> recruiterProfiles, Page page) {
